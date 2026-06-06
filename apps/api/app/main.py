@@ -13,6 +13,8 @@ from app.job_analysis.service import (
     JobAnalysisValidationError,
     analyze_job_requirements,
 )
+from app.job_scoring.schemas import JobMatchPayload, ScoreNewJobsResponse
+from app.job_scoring.service import JobScoringError, score_job_for_profile, score_new_jobs_for_profile
 from app.job_discovery.schemas import JobDiscoveryResult
 from app.job_discovery.service import discover_jobs_for_profile
 from app.browser_jobs.schemas import BrowserJobPayload, BrowserJobResponse
@@ -149,6 +151,37 @@ def receive_extracted_job(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Browser job ingestion failed: {exc}") from exc
+
+
+@app.post("/profiles/{profile_id}/jobs/{job_id}/score", response_model=JobMatchPayload)
+def score_job(
+    profile_id: str,
+    job_id: str,
+    db: Session = Depends(get_db_session),
+) -> JobMatchPayload:
+    try:
+        return score_job_for_profile(db=db, profile_id=profile_id, job_id=job_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except JobScoringError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Job scoring failed: {exc}") from exc
+
+
+@app.post("/profiles/{profile_id}/agent/score-new-jobs", response_model=ScoreNewJobsResponse)
+def score_new_jobs(
+    profile_id: str,
+    db: Session = Depends(get_db_session),
+) -> ScoreNewJobsResponse:
+    try:
+        return score_new_jobs_for_profile(db=db, profile_id=profile_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except JobScoringError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Job scoring failed: {exc}") from exc
 
 
 @app.post("/profiles/{profile_id}/jobs/{job_id}/analyze")
