@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getPanelStatusMessage, panelHighlights } from "./panel";
+import {
+  autofillSafetyNotes,
+  getPanelStatusMessage,
+  panelHighlights,
+} from "./panel";
 
 describe("panel helpers", () => {
   it("describes supported site inspection safely", () => {
@@ -8,6 +12,7 @@ describe("panel helpers", () => {
   });
 
   it("exposes the key safety points", () => {
-    expect(panelHighlights).toContain("Stop before final submit");
+    expect(panelHighlights).toContain("Fill trusted profile data");
+    expect(autofillSafetyNotes).toContain("No submission clicks are performed by the engine.");
   });
 });
