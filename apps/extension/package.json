@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "linkedom": "^0.18.12",
     "plasmo": "^0.90.5",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"

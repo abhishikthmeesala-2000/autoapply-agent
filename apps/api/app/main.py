@@ -8,6 +8,8 @@ from pydantic import BaseModel
 
 from app.job_discovery.schemas import JobDiscoveryResult
 from app.job_discovery.service import discover_jobs_for_profile
+from app.browser_jobs.schemas import BrowserJobPayload, BrowserJobResponse
+from app.browser_jobs.service import receive_browser_job
 from app.db.session import create_session_factory
 from app.resume.parser import ResumeParseError
 from app.resume.schemas import (
@@ -115,3 +117,20 @@ def discover_jobs(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Job discovery failed: {exc}") from exc
+
+
+@app.post("/profiles/{profile_id}/jobs/extracted", response_model=BrowserJobResponse)
+def receive_extracted_job(
+    profile_id: str,
+    payload: BrowserJobPayload,
+    db: Session = Depends(get_db_session),
+) -> BrowserJobResponse:
+    if payload.profile_id != profile_id:
+        raise HTTPException(status_code=400, detail="profile_id in path and body must match.")
+
+    try:
+        return receive_browser_job(db=db, payload=payload)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Browser job ingestion failed: {exc}") from exc
