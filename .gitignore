@@ -14,6 +14,7 @@ apps/**/node_modules
 packages/**/node_modules
 apps/**/.next
 apps/**/.plasmo
+*.tsbuildinfo
 apps/**/dist
 apps/**/build
 packages/**/dist
