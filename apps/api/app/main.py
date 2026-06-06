@@ -28,6 +28,12 @@ from app.resume.schemas import (
 )
 from app.resume.service import get_latest_master_resume, ingest_resume_upload, list_resume_evidence
 from app.resume.vector_store import NoopResumeVectorStore, QdrantResumeVectorStore
+from app.resume_tailoring.schemas import TailoredResumeResponse
+from app.resume_tailoring.service import (
+    ResumeTailoringEligibilityError,
+    ResumeTailoringError,
+    tailor_resume_for_profile,
+)
 
 
 class HealthResponse(BaseModel):
@@ -182,6 +188,24 @@ def score_new_jobs(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Job scoring failed: {exc}") from exc
+
+
+@app.post("/profiles/{profile_id}/jobs/{job_id}/tailor-resume", response_model=TailoredResumeResponse)
+def tailor_resume(
+    profile_id: str,
+    job_id: str,
+    db: Session = Depends(get_db_session),
+) -> TailoredResumeResponse:
+    try:
+        return tailor_resume_for_profile(db=db, profile_id=profile_id, job_id=job_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ResumeTailoringEligibilityError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ResumeTailoringError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Resume tailoring failed: {exc}") from exc
 
 
 @app.post("/profiles/{profile_id}/jobs/{job_id}/analyze")
