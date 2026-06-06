@@ -4,6 +4,8 @@
 
 :root {
   color-scheme: dark;
+  --page-bg: #020617;
+  --page-fg: #e2e8f0;
 }
 
 html,
@@ -11,10 +13,35 @@ body {
   height: 100%;
 }
 
-body {
-  background:
-    radial-gradient(circle at top, rgba(59, 130, 246, 0.2), transparent 24%),
-    linear-gradient(180deg, #020617 0%, #0f172a 100%);
-  color: #e2e8f0;
+html {
+  background: var(--page-bg);
 }
 
+body {
+  background:
+    radial-gradient(circle at top, rgba(34, 211, 238, 0.16), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(56, 189, 248, 0.08), transparent 18%),
+    linear-gradient(180deg, #020617 0%, #0f172a 100%);
+  color: var(--page-fg);
+  font-family:
+    "Avenir Next",
+    "Segoe UI",
+    "Helvetica Neue",
+    sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+a,
+button {
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+::selection {
+  background: rgba(34, 211, 238, 0.28);
+  color: #f8fafc;
+}

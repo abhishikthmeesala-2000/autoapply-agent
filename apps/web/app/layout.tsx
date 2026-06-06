@@ -6,7 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "CareerOS AI",
   description:
-    "Local-first career operating system for job discovery and application prep.",
+    "Local-first career operating system for job discovery, resume tailoring, and approval-first automation.",
 };
 
 export default function RootLayout({
