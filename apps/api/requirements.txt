@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+pydantic
+pytest
+httpx
+ruff
+sqlalchemy
+alembic
+psycopg[binary]
+python-docx
+pypdf
+qdrant-client
+reportlab
+python-multipart

@@ -1,0 +1,17 @@
+{
+  "name": "careeros-ai",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "make dev",
+    "test": "make test",
+    "lint": "make lint",
+    "format": "make format"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.3"
+  }
+}
