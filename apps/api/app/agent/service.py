@@ -14,6 +14,7 @@ from app.db.models import (
     ProfileSetting,
     ResumeVersion,
 )
+from app.maintenance.service import record_audit_log
 from app.job_scoring.schemas import JobMatchPayload
 from app.job_discovery.service import discover_jobs_for_profile
 from app.job_scoring.service import score_new_jobs_for_profile
@@ -27,6 +28,7 @@ class AgentModeError(RuntimeError):
 
 class AgentModeEligibilityError(AgentModeError):
     pass
+
 
 def _fetch_profile(db: Session, profile_id: str) -> Profile:
     profile = db.get(Profile, profile_id)
@@ -271,6 +273,15 @@ def start_continuous_agent_mode(
             f"prepared {metadata.applications_prepared} applications."
         )
         _persist_run_status(db, agent_run, status="running", metadata=metadata)
+        record_audit_log(
+            db=db,
+            profile_id=profile_id,
+            actor_type="user",
+            action="agent_start",
+            entity_type="agent_run",
+            entity_id=agent_run.id,
+            details_json=metadata.model_dump(mode="json"),
+        )
         db.commit()
         db.refresh(agent_run)
         return _build_response(agent_run, metadata, summary)
@@ -279,6 +290,15 @@ def start_continuous_agent_mode(
         metadata.error = str(exc)
         metadata.notes.append("Agent cycle failed; automation remains paused for safety.")
         _persist_run_status(db, agent_run, status="paused", metadata=metadata)
+        record_audit_log(
+            db=db,
+            profile_id=profile_id,
+            actor_type="system",
+            action="agent_start_failed",
+            entity_type="agent_run",
+            entity_id=agent_run.id,
+            details_json=metadata.model_dump(mode="json"),
+        )
         db.commit()
         db.refresh(agent_run)
         raise AgentModeError(f"Agent start failed: {exc}") from exc
@@ -293,6 +313,15 @@ def pause_continuous_agent_mode(*, db: Session, profile_id: str) -> AgentControl
     metadata = _load_metadata(agent_run)
     metadata.notes.append("Continuous agent mode paused by the user.")
     _persist_run_status(db, agent_run, status="paused", metadata=metadata)
+    record_audit_log(
+        db=db,
+        profile_id=profile_id,
+        actor_type="user",
+        action="agent_pause",
+        entity_type="agent_run",
+        entity_id=agent_run.id,
+        details_json=metadata.model_dump(mode="json"),
+    )
     db.commit()
     db.refresh(agent_run)
     return _build_response(
@@ -311,6 +340,15 @@ def stop_continuous_agent_mode(*, db: Session, profile_id: str) -> AgentControlR
     metadata = _load_metadata(agent_run)
     metadata.notes.append("Continuous agent mode stopped by the user.")
     _persist_run_status(db, agent_run, status="stopped", metadata=metadata, ended_at=datetime.utcnow())
+    record_audit_log(
+        db=db,
+        profile_id=profile_id,
+        actor_type="user",
+        action="agent_stop",
+        entity_type="agent_run",
+        entity_id=agent_run.id,
+        details_json=metadata.model_dump(mode="json"),
+    )
     db.commit()
     db.refresh(agent_run)
     return _build_response(

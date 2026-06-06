@@ -65,6 +65,7 @@ autoapply-agent/
 - Database access
 - AI model coordination
 - File upload and export endpoints
+- Maintenance endpoints for audit logs, encrypted backups, and data deletion
 
 ### apps/extension
 
@@ -276,6 +277,8 @@ AI output handling:
 - Audit logs record important actions
 - File uploads require size and type validation
 - Generated documents should avoid leaking hidden metadata
+- Backup exports are encrypted before leaving the API boundary
+- Data deletion preserves audit history for incident review
 
 ## Deployment Architecture
 

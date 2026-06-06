@@ -137,3 +137,43 @@ Purpose:
 Purpose:
 
 - Stop continuous agent mode
+
+## Phase 15 Contract
+
+### GET /profiles/{profile_id}/audit-logs
+
+Purpose:
+
+- Return the profile audit trail newest-first
+- Fail closed if the profile does not exist
+
+### POST /profiles/{profile_id}/backup
+
+Purpose:
+
+- Export an encrypted profile backup
+- Require name confirmation and a passphrase
+
+Response headers:
+
+- `X-Backup-Encrypted: true`
+- `Content-Disposition: attachment; filename="careeros-profile-<id>-backup.json.enc"`
+
+### DELETE /profiles/{profile_id}/data
+
+Purpose:
+
+- Delete profile-scoped operational data while preserving audit logs
+- Require name confirmation before deleting anything
+
+Response:
+
+```json
+{
+  "profile_id": "uuid",
+  "preserved_audit_logs": 0,
+  "deleted_counts": {
+    "jobs": 0
+  }
+}
+```

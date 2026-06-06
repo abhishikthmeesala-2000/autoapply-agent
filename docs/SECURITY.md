@@ -114,6 +114,15 @@
 - Log key actions
 - Log profile-aware operations
 - Log agent decisions and approval events
+- Record backup and deletion requests for profile data
+- Preserve audit logs even when profile-scoped operational data is deleted
+
+### Backup and deletion safety
+
+- Encrypted backups derive keys from a user-provided passphrase and random salt
+- Backup exports require explicit profile-name confirmation before serialization
+- Deletion requests require explicit profile-name confirmation before any rows are removed
+- Data deletion should preserve audit logs so incident review remains possible
 
 ## Explicit Non-Goals
 
@@ -149,3 +158,10 @@ If a bug causes profile leakage, wrong-profile application prep, or unsafe autof
 - Reproduce with tests
 - Patch at the policy and code level
 - Add regression coverage before proceeding
+
+If a bug weakens backup encryption or deletes audit history:
+
+- Disable the maintenance endpoint
+- Verify the confirmation gate and encryption flow
+- Re-run integrity tests against a seeded profile
+- Restore from backup only after validating the encrypted payload format

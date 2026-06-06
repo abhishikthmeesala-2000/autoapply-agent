@@ -12,3 +12,4 @@ pypdf
 qdrant-client
 reportlab
 python-multipart
+cryptography

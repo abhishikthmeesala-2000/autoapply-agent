@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from os import getenv
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Body, Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 import httpx
 from sqlalchemy.orm import Session
@@ -14,6 +14,20 @@ from app.agent.service import (
     pause_continuous_agent_mode,
     start_continuous_agent_mode,
     stop_continuous_agent_mode,
+)
+from app.maintenance.schemas import (
+    AuditLogPayload,
+    BackupRequest,
+    DeletionRequest,
+    DeletionResponse,
+)
+from app.maintenance.service import (
+    MaintenanceError,
+    MaintenanceEligibilityError,
+    create_encrypted_profile_backup,
+    delete_profile_data,
+    list_audit_logs_for_profile,
+    record_audit_log,
 )
 from app.document_export.service import DocumentExportError, export_resume_version_package
 from app.job_analysis.schemas import JobAnalysisResponse
@@ -141,6 +155,95 @@ def get_resume_evidence(
 ) -> list[ResumeEvidencePayload]:
     evidence = list_resume_evidence(db, profile_id)
     return [ResumeEvidencePayload.model_validate(item, from_attributes=True) for item in evidence]
+
+
+@app.get("/profiles/{profile_id}/audit-logs", response_model=list[AuditLogPayload])
+def get_audit_logs(
+    profile_id: str,
+    db: Session = Depends(get_db_session),
+) -> list[AuditLogPayload]:
+    try:
+        return [
+            AuditLogPayload.model_validate(log, from_attributes=True)
+            for log in list_audit_logs_for_profile(db, profile_id)
+        ]
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/profiles/{profile_id}/backup", response_class=StreamingResponse)
+def export_encrypted_backup(
+    profile_id: str,
+    payload: BackupRequest,
+    db: Session = Depends(get_db_session),
+) -> StreamingResponse:
+    try:
+        file_name, backup_bytes = create_encrypted_profile_backup(
+            db=db,
+            profile_id=profile_id,
+            confirm_profile_name=payload.confirm_profile_name,
+            passphrase=payload.passphrase,
+        )
+        record_audit_log(
+            db=db,
+            profile_id=profile_id,
+            actor_type="user",
+            action="export_encrypted_backup",
+            entity_type="profile",
+            entity_id=profile_id,
+            details_json={"file_name": file_name, "backup_bytes": len(backup_bytes)},
+        )
+        db.commit()
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except MaintenanceEligibilityError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except MaintenanceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Backup export failed: {exc}") from exc
+
+    return StreamingResponse(
+        iter([backup_bytes]),
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{file_name}"',
+            "X-Backup-Encrypted": "true",
+        },
+    )
+
+
+@app.delete("/profiles/{profile_id}/data", response_model=DeletionResponse)
+def delete_profile_data_route(
+    profile_id: str,
+    payload: DeletionRequest = Body(...),
+    db: Session = Depends(get_db_session),
+) -> DeletionResponse:
+    try:
+        response = delete_profile_data(
+            db=db,
+            profile_id=profile_id,
+            confirm_profile_name=payload.confirm_profile_name,
+        )
+        record_audit_log(
+            db=db,
+            profile_id=profile_id,
+            actor_type="user",
+            action="confirm_profile_data_deletion",
+            entity_type="profile",
+            entity_id=profile_id,
+            details_json=response.model_dump(mode="json"),
+        )
+        db.commit()
+        return response
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except MaintenanceEligibilityError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except MaintenanceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Profile deletion failed: {exc}") from exc
 
 
 @app.post("/profiles/{profile_id}/agent/discover-jobs", response_model=JobDiscoveryResult)
