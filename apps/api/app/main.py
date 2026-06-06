@@ -6,6 +6,13 @@ import httpx
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
+from app.ai.client import OllamaClient
+from app.job_analysis.schemas import JobAnalysisResponse
+from app.job_analysis.service import (
+    JobAnalysisError,
+    JobAnalysisValidationError,
+    analyze_job_requirements,
+)
 from app.job_discovery.schemas import JobDiscoveryResult
 from app.job_discovery.service import discover_jobs_for_profile
 from app.browser_jobs.schemas import BrowserJobPayload, BrowserJobResponse
@@ -49,6 +56,14 @@ def get_db_session() -> Generator[Session, None, None]:
 
 def get_job_discovery_client() -> Generator[httpx.Client, None, None]:
     client = httpx.Client(timeout=30.0)
+    try:
+        yield client
+    finally:
+        client.close()
+
+
+def get_ollama_client() -> Generator[OllamaClient, None, None]:
+    client = OllamaClient()
     try:
         yield client
     finally:
@@ -134,3 +149,27 @@ def receive_extracted_job(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Browser job ingestion failed: {exc}") from exc
+
+
+@app.post("/profiles/{profile_id}/jobs/{job_id}/analyze")
+def analyze_job(
+    profile_id: str,
+    job_id: str,
+    db: Session = Depends(get_db_session),
+    ai_client: OllamaClient = Depends(get_ollama_client),
+) -> JobAnalysisResponse:
+    try:
+        return analyze_job_requirements(
+            db=db,
+            profile_id=profile_id,
+            job_id=job_id,
+            ai_client=ai_client,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except JobAnalysisValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except JobAnalysisError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Job analysis failed: {exc}") from exc
