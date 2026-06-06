@@ -8,6 +8,13 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.ai.client import OllamaClient
+from app.agent.schemas import AgentControlResponse
+from app.agent.service import (
+    AgentModeError,
+    pause_continuous_agent_mode,
+    start_continuous_agent_mode,
+    stop_continuous_agent_mode,
+)
 from app.document_export.service import DocumentExportError, export_resume_version_package
 from app.job_analysis.schemas import JobAnalysisResponse
 from app.job_analysis.service import (
@@ -148,6 +155,52 @@ def discover_jobs(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Job discovery failed: {exc}") from exc
+
+
+@app.post("/profiles/{profile_id}/agent/start", response_model=AgentControlResponse)
+def start_agent_mode(
+    profile_id: str,
+    db: Session = Depends(get_db_session),
+    client: httpx.Client = Depends(get_job_discovery_client),
+) -> AgentControlResponse:
+    try:
+        return start_continuous_agent_mode(db=db, profile_id=profile_id, client=client)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except AgentModeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Agent start failed: {exc}") from exc
+
+
+@app.post("/profiles/{profile_id}/agent/pause", response_model=AgentControlResponse)
+def pause_agent_mode(
+    profile_id: str,
+    db: Session = Depends(get_db_session),
+) -> AgentControlResponse:
+    try:
+        return pause_continuous_agent_mode(db=db, profile_id=profile_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except AgentModeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Agent pause failed: {exc}") from exc
+
+
+@app.post("/profiles/{profile_id}/agent/stop", response_model=AgentControlResponse)
+def stop_agent_mode(
+    profile_id: str,
+    db: Session = Depends(get_db_session),
+) -> AgentControlResponse:
+    try:
+        return stop_continuous_agent_mode(db=db, profile_id=profile_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except AgentModeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Agent stop failed: {exc}") from exc
 
 
 @app.post("/profiles/{profile_id}/jobs/extracted", response_model=BrowserJobResponse)

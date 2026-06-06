@@ -1,6 +1,7 @@
-import { PauseCircle, PlayCircle, Power, Workflow } from "lucide-react";
+import { Workflow } from "lucide-react";
 
 import { DashboardShell } from "../../src/components/dashboard-shell";
+import { AgentControls } from "../../src/components/agent-controls";
 import { getDashboardSnapshot, resolveActiveProfileId } from "../../src/lib/dashboard";
 
 interface AgentPageProps {
@@ -58,25 +59,8 @@ export default async function AgentPage({ searchParams }: AgentPageProps) {
         <aside className="space-y-6">
           <article className="rounded-[1.75rem] border border-slate-800/80 bg-slate-950/75 p-6 shadow-glow">
             <h3 className="text-xl font-semibold text-white">Controls</h3>
-            <div className="mt-5 grid gap-3">
-              {[
-                { icon: PlayCircle, label: "Start" },
-                { icon: PauseCircle, label: "Pause" },
-                { icon: Power, label: "Stop" },
-              ].map((control) => {
-                const Icon = control.icon;
-
-                return (
-                  <button
-                    key={control.label}
-                    type="button"
-                    className="flex items-center justify-between rounded-2xl border border-slate-800 bg-white/5 px-4 py-3 text-left text-sm text-white transition hover:border-cyan-400/30 hover:bg-cyan-400/10"
-                  >
-                    <span>{control.label} agent mode</span>
-                    <Icon className="h-4 w-4 text-cyan-300" />
-                  </button>
-                );
-              })}
+            <div className="mt-5">
+              <AgentControls profileId={snapshot.profile.id} />
             </div>
           </article>
 
@@ -94,4 +78,3 @@ export default async function AgentPage({ searchParams }: AgentPageProps) {
     </DashboardShell>
   );
 }
-
