@@ -34,6 +34,12 @@ from app.resume_tailoring.service import (
     ResumeTailoringError,
     tailor_resume_for_profile,
 )
+from app.ats_validation.schemas import AtsValidationResponse
+from app.ats_validation.service import (
+    AtsValidationEligibilityError,
+    AtsValidationError,
+    validate_resume_version_for_profile,
+)
 
 
 class HealthResponse(BaseModel):
@@ -206,6 +212,28 @@ def tailor_resume(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Resume tailoring failed: {exc}") from exc
+
+
+@app.post("/profiles/{profile_id}/resume_versions/{resume_version_id}/validate", response_model=AtsValidationResponse)
+def validate_resume_version(
+    profile_id: str,
+    resume_version_id: str,
+    db: Session = Depends(get_db_session),
+) -> AtsValidationResponse:
+    try:
+        return validate_resume_version_for_profile(
+            db=db,
+            profile_id=profile_id,
+            resume_version_id=resume_version_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except AtsValidationEligibilityError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except AtsValidationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"ATS validation failed: {exc}") from exc
 
 
 @app.post("/profiles/{profile_id}/jobs/{job_id}/analyze")

@@ -101,6 +101,15 @@ Purpose:
 
 - Generate a tailored resume JSON from evidence-backed source data
 
+## Phase 10 Contract
+
+### POST /profiles/{profile_id}/resume_versions/{id}/validate
+
+Purpose:
+
+- Validate ATS structure, keyword coverage, readability, and extractability
+- Persist the ATS score for the tailored resume version
+
 ## Phase 11 Contract
 
 ### POST /profiles/{profile_id}/resume_versions/{id}/export
