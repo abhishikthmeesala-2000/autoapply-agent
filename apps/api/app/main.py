@@ -2,11 +2,13 @@ from collections.abc import Generator
 from os import getenv
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 import httpx
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.ai.client import OllamaClient
+from app.document_export.service import DocumentExportError, export_resume_version_package
 from app.job_analysis.schemas import JobAnalysisResponse
 from app.job_analysis.service import (
     JobAnalysisError,
@@ -234,6 +236,46 @@ def validate_resume_version(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"ATS validation failed: {exc}") from exc
+
+
+@app.post(
+    "/profiles/{profile_id}/resume_versions/{resume_version_id}/export",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "content": {"application/zip": {}},
+            "description": "A ZIP archive containing DOCX and PDF exports.",
+        }
+    },
+)
+def export_resume_version(
+    profile_id: str,
+    resume_version_id: str,
+    db: Session = Depends(get_db_session),
+) -> StreamingResponse:
+    try:
+        exported = export_resume_version_package(
+            db=db,
+            profile_id=profile_id,
+            resume_version_id=resume_version_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except DocumentExportError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Resume export failed: {exc}") from exc
+
+    return StreamingResponse(
+        iter([exported.archive_bytes]),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{exported.archive_name}"',
+            "X-Resume-Version-Id": resume_version_id,
+            "X-Docx-File-Name": exported.docx_name,
+            "X-Pdf-File-Name": exported.pdf_name,
+        },
+    )
 
 
 @app.post("/profiles/{profile_id}/jobs/{job_id}/analyze")
