@@ -109,6 +109,44 @@ def test_encrypted_backup_round_trip_includes_audit_logs(db_session) -> None:
     assert payload["backup"]["counts"]["audit_logs"] == 1
 
 
+def test_encrypted_backup_rejects_name_mismatch(db_session) -> None:
+    profile = _create_profile(db_session)
+    _seed_profile_data(db_session, profile)
+
+    def override_db():
+        yield db_session
+
+    app.dependency_overrides[get_db_session] = override_db
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/profiles/{profile.id}/backup",
+                json={
+                    "passphrase": "correct horse battery staple",
+                    "confirm_profile_name": "Not The Right Name",
+                },
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    assert "did not match" in response.json()["detail"]
+
+
+def test_audit_logs_unknown_profile_returns_404(db_session) -> None:
+    def override_db():
+        yield db_session
+
+    app.dependency_overrides[get_db_session] = override_db
+    try:
+        with TestClient(app) as client:
+            response = client.get(f"/profiles/{uuid4()}/audit-logs")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+
+
 def test_delete_profile_data_preserves_audit_logs_and_requires_confirmation(db_session) -> None:
     profile = _create_profile(db_session)
     _seed_profile_data(db_session, profile)
@@ -155,6 +193,24 @@ def test_delete_profile_data_preserves_audit_logs_and_requires_confirmation(db_s
     assert db_session.query(MasterResume).filter(MasterResume.profile_id == profile.id).count() == 0
     assert db_session.query(AnswerBank).filter(AnswerBank.profile_id == profile.id).count() == 0
     assert db_session.query(Profile).filter(Profile.id == profile.id).count() == 1
+
+
+def test_delete_profile_data_unknown_profile_returns_404(db_session) -> None:
+    def override_db():
+        yield db_session
+
+    app.dependency_overrides[get_db_session] = override_db
+    try:
+        with TestClient(app) as client:
+            response = client.request(
+                "DELETE",
+                f"/profiles/{uuid4()}/data",
+                json={"confirm_profile_name": "Missing"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 404
 
 
 def test_audit_log_endpoint_returns_newest_first(db_session) -> None:

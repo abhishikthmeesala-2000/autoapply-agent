@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.db.models import (
     Application,
+    AgentRun,
     Job,
     JobRequirement,
     MasterResume,
@@ -281,3 +282,26 @@ def test_agent_start_respects_daily_application_limit(db_session) -> None:
         == 1
     )
 
+
+def test_agent_start_is_idempotent_for_existing_draft_application(db_session) -> None:
+    profile = _create_profile(db_session)
+    job = _create_discovered_job(db_session, profile.id)
+    _create_requirement(db_session, profile.id, job.id)
+    _create_resume_and_version(db_session, profile.id, job.id)
+
+    app.dependency_overrides[get_db_session] = _override_db(db_session)
+    app.dependency_overrides[get_job_discovery_client] = _override_client()
+    try:
+        with TestClient(app) as client:
+            first_response = client.post(f"/profiles/{profile.id}/agent/start")
+            second_response = client.post(f"/profiles/{profile.id}/agent/start")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert (
+        db_session.query(Application).filter(Application.profile_id == profile.id).count()
+        == 1
+    )
+    assert db_session.query(AgentRun).filter(AgentRun.profile_id == profile.id).count() == 2
